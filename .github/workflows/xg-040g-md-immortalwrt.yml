@@ -21,7 +21,6 @@ env:
   UPLOAD_BIN_DIR: false
   FIRMWARE_RELEASE: true
   TZ: Asia/Shanghai
-  # 你的补丁仓库地址
   PATCH_REPO: https://github.com/kzio111/ImmortalWrt-XG-040G-MD.git
   PATCH_DIR: patch-25.12
 
@@ -108,7 +107,8 @@ jobs:
         cd $OPENWRT_PATH
         make defconfig
         grep "CONFIG_PACKAGE_luci-app-airoha-npu" .config || echo "WARNING: option missing!"
-        - name: Apply Custom Patches & DIY Script(应用补丁和自定义脚本)
+
+    - name: Apply Custom Patches & DIY Script(应用补丁和自定义脚本)
       run: |
         echo "拉取补丁仓库..."
         git clone --depth=1 -b main $PATCH_REPO /tmp/patch-repo
@@ -118,7 +118,7 @@ jobs:
         chmod +x patch.sh
         ./patch.sh
         echo "补丁部署完成"
-        # 如果 diy.sh 在补丁仓库的根目录，则复制并执行
+        # 如果 diy.sh 在补丁仓库根目录，则复制并执行
         if [ -f /tmp/patch-repo/diy.sh ]; then
           cp /tmp/patch-repo/diy.sh $OPENWRT_PATH/
           cd $OPENWRT_PATH
@@ -129,6 +129,14 @@ jobs:
         make defconfig
         # 清理临时文件
         rm -rf /tmp/patch-repo $OPENWRT_PATH/$PATCH_DIR
+
+    - name: Download DL Package(下载DL软件包)
+      run: |
+        cd $OPENWRT_PATH
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
     - name: Compile Firmware(开始编译固件)
       id: compile
       run: |
