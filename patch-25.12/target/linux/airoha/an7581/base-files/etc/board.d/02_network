@@ -17,15 +17,46 @@ an7581_setup_interfaces()
 	bell,xg-040g-md)
 		ucidef_set_interfaces_lan_wan "lan2 lan3 lan4" "eth1"
 		;;
+	gemtek,w1700k-ubi)
+		ucidef_set_interfaces_lan_wan "lan2 lan3 lan4" "wan"
+		;;
+	nokia,valyrian)
+		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 10g" "wan"
+		;;
 	*)
 		echo "Unsupported hardware. Network interfaces not initialized"
 		;;
 	esac
 }
 
+an7581_xg040g_ensure_mac()
+{
+	local board="$1"
+	local mac
+	local lan_mac
+
+	[ "$board" = "bell,xg-040g-md" ] || return 0
+	command -v fw_printenv >/dev/null 2>&1 || return 0
+	command -v fw_setenv >/dev/null 2>&1 || return 0
+
+	mac="$(fw_printenv -n ethaddr 2>/dev/null)"
+	mac="$(macaddr_canonicalize "$mac")"
+
+	if [ -z "$mac" ]; then
+		mac="$(macaddr_random)"
+		fw_setenv ethaddr "$mac" >/dev/null 2>&1 || return 0
+	fi
+
+	lan_mac="$(macaddr_add "$mac" 1)"
+
+	ucidef_set_interface_macaddr "wan" "$mac"
+	ucidef_set_interface_macaddr "lan" "$lan_mac"
+}
+
 board_config_update
 board=$(board_name)
 an7581_setup_interfaces $board
+an7581_xg040g_ensure_mac $board
 board_config_flush
 
 exit 0

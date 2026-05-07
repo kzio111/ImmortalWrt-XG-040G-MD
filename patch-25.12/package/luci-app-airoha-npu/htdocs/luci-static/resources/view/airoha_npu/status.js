@@ -11,10 +11,6 @@ var callFrameEngine = rpc.declare({ object: 'luci.airoha_npu', method: 'getFrame
 var callSetGovernor = rpc.declare({ object: 'luci.airoha_npu', method: 'setGovernor', params: ['governor'] });
 var callSetMaxFreq = rpc.declare({ object: 'luci.airoha_npu', method: 'setMaxFreq', params: ['freq'] });
 var callSetOverclock = rpc.declare({ object: 'luci.airoha_npu', method: 'setOverclock', params: ['freq_mhz'] });
-var callGetVlanOffload = rpc.declare({ object: 'luci.airoha_npu', method: 'getVlanOffload' });
-var callSetVlanOffload = rpc.declare({ object: 'luci.airoha_npu', method: 'setVlanOffload', params: ['enabled'] });
-var callGetPPPoEOffload = rpc.declare({ object: 'luci.airoha_npu', method: 'getPPPoEOffload' });
-var callSetPPPoEOffload = rpc.declare({ object: 'luci.airoha_npu', method: 'setPPPoEOffload', params: ['enabled'] });
 
 /* ── Theme-adaptive CSS ── */
 var themeCSS = '\
@@ -74,17 +70,16 @@ var bandInfo = [
 ];
 
 var psePortMap = [
-	{ name: 'CDM1', label: 'CPU DMA 1',   color: '#607d8b' },
-	{ name: 'GDM1', label: 'Switch 1G',   color: '#ff9800' },
-	{ name: 'GDM2', label: 'WAN 10G',     color: '#4caf50' },
-	{ name: 'GDM3', label: 'GDM3',        color: '#607d8b' },
-	{ name: 'PPE1', label: 'PPE Eng 1',   color: '#2196f3' },
-	{ name: 'CDM2', label: 'CPU DMA 2',   color: '#607d8b' },
-	{ name: 'CDM3', label: 'CDM3',        color: '#607d8b' },
-	{ name: 'CDM4', label: 'WDMA WiFi',   color: '#9c27b0' },
-	{ name: 'PPE2', label: 'PPE Eng 2',   color: '#2196f3' },
-	{ name: 'GDM4', label: 'LAN2 10G',    color: '#4caf50' }
+	{ name: 'CDM1', label: 'CPU DMA 1',   color: '#607d8b' }, // P0
+	{ name: 'GDM1', label: 'Switch 1G',   color: '#ff9800' }, // P1
+	{ name: 'GDM3', label: 'GDM3',        color: '#607d8b' }, // P3
+	{ name: 'PPE1', label: 'PPE Eng 1',   color: '#2196f3' }, // P4
+	{ name: 'CDM3', label: 'CDM3',        color: '#607d8b' }, // P6
+	{ name: 'PPE2', label: 'PPE Eng 2',   color: '#2196f3' },  // P8
+	{ name: 'GDM2', label: '2.5G Port',     color: '#4caf50' }, //P2
+	{ name: 'CDM2', label: 'CPU DMA 2',   color: '#607d8b' }, //P5
 ];
+
 
 function fmtFreq(khz) { return (!khz || khz === 0) ? 'N/A' : (khz / 1000).toFixed(0) + ' MHz'; }
 function fmtK(n) {
@@ -168,12 +163,12 @@ function updateBandChip(band, stats) {
 }
 
 /* ── Frame Engine Diagram (with WiFi bands, NPU, PPE flows) ── */
+/* ── Frame Engine Diagram (Optimized for 040g-md) ── */
 function renderFeDiagram(fe, ti, st) {
 	if (!fe || fe.error) return E('div', { 'class': 'soc-muted' }, 'devmem not available on this build');
 	ti = ti || {}; st = st || {};
 
 	var ports = Array.isArray(fe.pse_ports) ? fe.pse_ports : [];
-
 	// Helper: GDM card
 	function gdmCard(key, name, label, color, pse) {
 		var d = fe[key] || {};
@@ -187,11 +182,7 @@ function renderFeDiagram(fe, ti, st) {
 			E('div', { 'style': 'display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px' }, [
 				E('span', { 'class': 'soc-muted' }, 'TX'), E('span', { 'class': 'soc-text', 'style': 'text-align:right' }, fmtK(d.tx)),
 				E('span', { 'class': 'soc-muted' }, 'RX'), E('span', { 'class': 'soc-text', 'style': 'text-align:right' }, fmtK(d.rx))
-			].concat(d.tx_drop > 0 ? [
-				E('span', { 'style': 'color:#f44336' }, 'TX Drop'), E('span', { 'style': 'color:#f44336;text-align:right' }, fmtK(d.tx_drop))
-			] : []).concat(d.rx_drop > 0 ? [
-				E('span', { 'style': 'color:#f44336' }, 'RX Drop'), E('span', { 'style': 'color:#f44336;text-align:right' }, fmtK(d.rx_drop))
-			] : []))
+			])
 		]);
 	}
 
@@ -218,26 +209,6 @@ function renderFeDiagram(fe, ti, st) {
 		]);
 	}
 
-	// WiFi band chips for CDM4
-	var bandChips = [];
-	for (var b = 0; b < 3; b++) bandChips.push(renderBandChip(b, getTxQueue(ti, b), getBandStats(ti, b)));
-
-	// CDM4/WDMA + WiFi bands grouped
-	var p7 = ports[7] || { iq: 0, oq: 0, drops: 0 };
-	var cdm4WiFi = E('div', { 'class': 'soc-card soc-card-accent', 'style': 'border-left-color:#9c27b0' }, [
-		E('div', { 'style': 'display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px' }, [
-			E('span', { 'style': 'font-weight:bold;color:#9c27b0;font-size:14px' }, 'CDM4'),
-			E('span', { 'class': 'soc-label' }, 'P7 WiFi DMA')
-		]),
-		E('div', { 'style': 'display:flex;gap:12px;font-size:11px;margin-bottom:8px' }, [
-			E('span', { 'class': 'soc-muted' }, 'IQ '+p7.iq),
-			E('span', { 'class': 'soc-muted' }, 'OQ '+p7.oq),
-			p7.drops > 0 ? E('span', { 'style': 'color:#f44336' }, 'Drop '+fmtK(p7.drops)) : null
-		].filter(Boolean)),
-		// WiFi bands inside
-		E('div', { 'style': 'display:grid;grid-template-columns:repeat(3,1fr);gap:6px' }, bandChips)
-	]);
-
 	// NPU indicator
 	var npuActive = st.npu_loaded;
 	var npuCard = E('div', { 'class': 'soc-card', 'style': 'border-color:'+(npuActive?'#00bcd4':'var(--soc-border)') }, [
@@ -245,7 +216,7 @@ function renderFeDiagram(fe, ti, st) {
 			E('span', { 'style': 'font-weight:bold;color:#00bcd4;font-size:14px' }, 'NPU'),
 			E('span', { 'style': 'background:'+(npuActive?'#00695c':'#666')+';color:#fff;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:600' }, npuActive ? 'ACTIVE' : 'OFF')
 		]),
-		E('div', { 'class': 'soc-label', 'style': 'margin-bottom:4px' }, '8x RISC-V via PCIe RAM'),
+		E('div', { 'class': 'soc-label', 'style': 'margin-bottom:4px' }, '4x RISC-V via PCIe RAM'),
 		E('div', { 'style': 'font-size:11px' }, [
 			E('span', { 'class': 'soc-muted' }, 'Manages: '),
 			E('span', { 'class': 'soc-text', 'style': 'font-size:11px' }, 'PPE init, WDMA rings, flow stats')
@@ -256,7 +227,7 @@ function renderFeDiagram(fe, ti, st) {
 	var ppeCard = E('div', { 'class': 'soc-card', 'style': 'border-color:#2196f3' }, [
 		E('div', { 'style': 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px' }, [
 			E('span', { 'style': 'font-weight:bold;color:#2196f3;font-size:14px' }, 'PPE Engines'),
-			E('span', { 'class': 'soc-label' }, 'P4 + P8')
+			E('span', { 'class': 'soc-label' }, 'P4 + P4')
 		]),
 		E('div', { 'style': 'display:flex;gap:16px;font-size:12px' }, [
 			E('span', {}, [
@@ -289,7 +260,8 @@ function renderFeDiagram(fe, ti, st) {
 		]);
 	});
 
-	return E('div', { 'id': 'fe-diagram' }, [
+	// 返回精簡佈局
+	return E('div', { 'class': 'fe-diagram-container' }, [
 		// PSE buffer bar
 		E('div', { 'class': 'soc-card', 'style': 'margin-bottom:10px' }, [
 			E('div', { 'style': 'display:flex;justify-content:space-between;margin-bottom:4px' }, [
@@ -300,28 +272,25 @@ function renderFeDiagram(fe, ti, st) {
 				E('div', { 'style': 'background:'+pseCol+';height:100%;width:'+pseP+'%;border-radius:4px;transition:width .5s' })
 			])
 		]),
-		// Row 1: GDM ports
-		E('div', { 'class': 'soc-gdm-grid' }, [
-			gdmCard('gdm1', 'GDM1', 'Internal Switch (1G LAN3/4)', '#ff9800', 'P1'),
-			gdmCard('gdm2', 'GDM2', 'WAN (USXGMII 10G)', '#4caf50', 'P2'),
-			gdmCard('gdm4', 'GDM4', 'LAN2 (USXGMII 10G)', '#4caf50', 'P9')
+		// 上排：只顯示 GDM1 (Switch) 和 CDM1 (CPU DMA 1)
+		E('div', { 'style': 'display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:12px;margin-bottom:12px' }, [
+			gdmCard('gdm1', 'GDM1', 'Internal Switch (1G LAN2/4)', '#ff9800', 'P1'),
+			cdmCard('cdm1', 'CDM1', 'CPU DMA 1', 'P0')
 		]),
-		// Row 2: CDM1/CDM2 (CPU) + CDM4/WiFi
-		E('div', { 'style': 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px' }, [
-			cdmCard('cdm1', 'CDM1', 'CPU DMA 1', 'P0'),
-			cdmCard('cdm2', 'CDM2', 'CPU DMA 2', 'P5'),
-			cdm4WiFi
+		E('div', { 'style': 'display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:12px;margin-bottom:12px' }, [
+			gdmCard('gdm2', 'GDM2', '2.5G Port', '#ff9800', 'P2'),
+			cdmCard('cdm2', 'CDM2', 'CPU DMA 2', 'P0')
 		]),
-		// Row 3: PPE + NPU
-		E('div', { 'style': 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px' }, [
+		// 下排：PPE 和 NPU
+		E('div', { 'style': 'display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:12px' }, [
 			ppeCard,
 			npuCard
-		]),
-		// PSE port grid
-		E('div', { 'class': 'soc-text', 'style': 'font-size:12px;font-weight:600;margin-bottom:6px' }, 'PSE Port Queue Status'),
-		E('div', { 'class': 'soc-pse-grid' }, portCells)
+		])
+		// E('div', { 'class': 'soc-text', 'style': 'font-size:12px;font-weight:600;margin-bottom:6px' }, 'PSE Port Queue Status'),
+		// E('div', { 'class': 'soc-pse-grid' }, portCells)
 	]);
 }
+
 
 /* ── CPU Frequency ── */
 function freqBarState(hw, min, max, pll, gov) {
@@ -330,30 +299,69 @@ function freqBarState(hw, min, max, pll, gov) {
 }
 
 function renderFreqBar(hw, min, max, pll, gov) {
-	if (!max) return E('span',{},'N/A');
-	var s = freqBarState(hw,min,max,pll,gov);
-	var pct = Math.round(((s.freq-min)/(s.max-min))*100);
-	pct = Math.max(0,Math.min(100,pct));
-	var bg = s.oc ? 'linear-gradient(90deg,#e65100,#ff9800)' : 'linear-gradient(90deg,#2e7d32,#66bb6a)';
-	var label = s.oc ? (pll+' MHz (OC)') : fmtFreq(s.freq);
+    if (!max) return E('span', {}, 'N/A');
 
-	return E('div', { 'id':'cpu-freq-bar-wrap', 'style':'display:flex;align-items:center;gap:10px' }, [
-		E('span', { 'class':'soc-muted', 'style':'font-size:90%' }, fmtFreq(min)),
-		E('div', { 'style':'flex:1;border-radius:4px;height:22px;position:relative;min-width:180px;max-width:350px;overflow:hidden', 'class':'soc-bar-track' }, [
-			E('div', { 'id':'cpu-freq-fill', 'style':'background:'+bg+';height:100%;border-radius:4px;width:'+pct+'%;transition:width .5s' }),
-			E('span', { 'id':'cpu-freq-text', 'style':'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)' }, label)
-		]),
-		E('span', { 'id':'cpu-freq-max-label', 'class':'soc-muted', 'style':'font-size:90%' }, fmtFreq(s.max))
-	]);
+	// 修改這裡：取 PLL 和當前頻率中的最大值，並處理單位
+    var val = Math.max(pll || 0, (hw > 2000 ? Math.round(hw / 1000) : hw));
+    
+    var current_mhz = val;
+    var display_min = 700;
+    var display_max = 1500; // 固定顯示上限為 1500，確保 1400 不爆表
+    
+    // 2. 重新定義 OC 判定：只有當頻率 > 1200 MHz 時才算超頻
+    var is_oc = (current_mhz > 1200);
+    
+    // 3. 計算百分比：基於固定座標 (700-1500)
+    var pct = Math.round(((current_mhz - display_min) / (display_max - display_min)) * 100);
+    pct = Math.max(0, Math.min(100, pct));
+    
+    // 4. 設定顏色與文字標籤
+    var bg = is_oc ? 'linear-gradient(90deg,#e65100,#ff9800)' : 'linear-gradient(90deg,#2e7d32,#66bb6a)';
+    
+    // 文字邏輯：超頻顯示 (OC)，普通狀態顯示 MHz
+    var label = current_mhz + ' MHz' + (is_oc ? ' (OC)' : '');
+
+    return E('div', { 'id': 'cpu-freq-bar-wrap', 'style': 'display:flex;align-items:center;gap:10px' }, [
+        E('span', { 'class': 'soc-muted', 'style': 'font-size:90%' }, display_min + ' MHz'),
+        E('div', { 'style': 'flex:1;border-radius:4px;height:22px;position:relative;min-width:180px;max-width:350px;overflow:hidden', 'class': 'soc-bar-track' }, [
+            E('div', { 'id': 'cpu-freq-fill', 'style': 'background:' + bg + ';height:100%;border-radius:4px;width:' + pct + '%;transition:width .5s' }),
+            E('span', { 'id': 'cpu-freq-text', 'style': 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)' }, label)
+        ]),
+        E('span', { 'id': 'cpu-freq-max-label', 'class': 'soc-muted', 'style': 'font-size:90%' }, display_max + ' MHz')
+    ]);
 }
 
 function updateFreqBar(hw, min, max, pll, gov) {
-	var s = freqBarState(hw,min,max,pll,gov);
-	var el = document.getElementById('cpu-freq-text'), fl = document.getElementById('cpu-freq-fill'), ml = document.getElementById('cpu-freq-max-label');
-	if (el) el.textContent = s.oc ? (pll+' MHz (OC)') : fmtFreq(s.freq);
-	if (fl && s.max>0) { var pct=Math.max(0,Math.min(100,Math.round(((s.freq-min)/(s.max-min))*100))); fl.style.width=pct+'%'; fl.style.background=s.oc?'linear-gradient(90deg,#e65100,#ff9800)':'linear-gradient(90deg,#2e7d32,#66bb6a)'; }
-	if (ml) ml.textContent = fmtFreq(s.max);
+    var el = document.getElementById('cpu-freq-text'), fl = document.getElementById('cpu-freq-fill'), ml = document.getElementById('cpu-freq-max-label');
+    
+    // 1. 數值與單位修正：處理 Hz (1400000) 或 MHz (1400)
+    var val = Math.max(pll || 0, (hw > 2000 ? Math.round(hw / 1000) : hw));
+    
+    // 2. 座標設定：保持 700 到 1500 的顯示範圍
+    var d_min = 700;
+    var d_max = 1500;
+    
+    // 3. 修正 OC 判定：只有當頻率高於 1200 MHz 時才顯示為超頻狀態
+    // 加入 pll > 1200 的判定，確保手動超頻也被正確識別
+    var is_oc = (val > 1200);
+    
+    // 4. 更新中間文字：只有超頻時才加 (OC)
+    if (el) el.textContent = val + ' MHz' + (is_oc ? ' (OC)' : '');
+    
+    // 5. 更新進度條百分比與顏色
+    if (fl) {
+        // 計算百分比：(當前值 - 最小值) / (最大值 - 最小值)
+        var pct = Math.max(0, Math.min(100, Math.round(((val - d_min) / (d_max - d_min)) * 100)));
+        fl.style.width = pct + '%';
+        
+        // 超頻顯示橘色漸層，普通顯示綠色漸層
+        fl.style.background = is_oc ? 'linear-gradient(90deg,#e65100,#ff9800)' : 'linear-gradient(90deg,#2e7d32,#66bb6a)';
+    }
+    
+    // 6. 更新右側最大標籤
+    if (ml) ml.textContent = d_max + ' MHz';
 }
+
 
 function renderGovSelect(avail, active) {
 	var gs = (avail||'').trim().split(/\s+/).filter(Boolean);
@@ -374,11 +382,11 @@ function renderMaxFreqSelect(avail, cur) {
 }
 
 function renderOcControls() {
-	var inp = E('input',{'id':'oc-freq-input','type':'number','min':'500','max':'1600','step':'50','value':'1400','class':'cbi-input-text','style':'width:100px'});
+	var inp = E('input',{'id':'oc-freq-input','type':'number','min':'700','max':'1400','step':'50','value':'1400','class':'cbi-input-text','style':'width:100px'});
 	var btn = E('button',{'class':'cbi-button cbi-button-action','style':'margin-left:8px','click':function(){
 		var f=parseInt(document.getElementById('oc-freq-input').value);
-		if(isNaN(f)||f<500||f>1600){ui.addNotification(null,E('p',{},_('Must be 500-1600 MHz')),'error');return;}
-		if(f>1400&&!confirm('Frequencies above 1400 MHz may be unstable. Continue?')) return;
+		if(isNaN(f)||f<500||f>1400){ui.addNotification(null,E('p',{},_('Must be 500-1400 MHz')),'error');return;}
+		if(f>1500&&!confirm('Frequencies above 1500 MHz may be unstable. Continue?')) return;
 		btn.disabled=true;btn.textContent=_('Applying...');
 		callSetOverclock(f).then(function(r){btn.disabled=false;btn.textContent=_('Apply');
 			if(r&&r.error) ui.addNotification(null,E('p',{},_('Failed: ')+r.error),'error');
@@ -387,7 +395,7 @@ function renderOcControls() {
 	}},_('Apply'));
 	return E('div',{'style':'display:flex;align-items:center;gap:8px;flex-wrap:wrap'},[
 		inp, E('span',{'class':'soc-muted'},'MHz'), btn,
-		E('span',{'class':'soc-muted','style':'font-size:85%;margin-left:8px'},_('Direct PLL. Stock max 1200 MHz. Stable up to 1500 MHz.'))
+		E('span',{'class':'soc-muted','style':'font-size:85%;margin-left:8px'},_('Direct PLL. Stock max 1400 MHz. Stable up to 1500 MHz.'))
 	]);
 }
 
@@ -402,45 +410,15 @@ function renderPpeRows(entries) {
 	});
 }
 
-function renderVlanOffloadSelect(enabled) {
-	var cur = enabled ? '1' : '0';
-	return E('select', { 'id': 'vlan-offload-select', 'class': 'cbi-input-select', 'style': 'min-width:140px', 'change': function(ev) {
-		var v = parseInt(ev.target.value);
-		ev.target.disabled = true;
-		callSetVlanOffload(v).then(function(r) {
-			ev.target.disabled = false;
-			if (r && r.error) ui.addNotification(null, E('p', {}, _('Error: ') + r.error), 'error');
-		}).catch(function() { ev.target.disabled = false; });
-	}}, [
-		E('option', { 'value': '0', 'selected': cur === '0' ? '' : null }, _('Disabled')),
-		E('option', { 'value': '1', 'selected': cur === '1' ? '' : null }, _('Enabled'))
-	]);
-}
-
-function renderPPPoEOffloadSelect(enabled) {
-	var cur = enabled ? '1' : '0';
-	return E('select', { 'id': 'pppoe-offload-select', 'class': 'cbi-input-select', 'style': 'min-width:140px', 'change': function(ev) {
-		var v = parseInt(ev.target.value);
-		ev.target.disabled = true;
-		callSetPPPoEOffload(v).then(function(r) {
-			ev.target.disabled = false;
-			if (r && r.error) ui.addNotification(null, E('p', {}, _('Error: ') + r.error), 'error');
-		}).catch(function() { ev.target.disabled = false; });
-	}}, [
-		E('option', { 'value': '0', 'selected': cur === '0' ? '' : null }, _('Disabled')),
-		E('option', { 'value': '1', 'selected': cur === '1' ? '' : null }, _('Enabled'))
-	]);
-}
-
 /* ── Main View ── */
 return view.extend({
 	load: function() {
-		return Promise.all([ callNpuStatus(), callPpeEntries(), callTokenInfo(), callFrameEngine(), callGetVlanOffload(), callGetPPPoEOffload() ]);
+		return Promise.all([ callNpuStatus(), callPpeEntries(), callTokenInfo(), callFrameEngine() ]);
 	},
 
 	render: function(data) {
 		injectCSS();
-		var st = data[0]||{}, ppe = data[1]||{}, ti = data[2]||{}, fe = data[3]||{}, vo = data[4]||{}, po = data[5]||{};
+		var st = data[0]||{}, ppe = data[1]||{}, ti = data[2]||{}, fe = data[3]||{};
 		var entries = Array.isArray(ppe.entries) ? ppe.entries : [];
 		var memR = Array.isArray(st.memory_regions) ? st.memory_regions : [];
 
@@ -455,7 +433,8 @@ return view.extend({
 					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('Governor'))), E('td',{'class':'td'}, renderGovSelect(st.cpu_avail_governors,st.cpu_governor)) ]),
 					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('Max Frequency'))), E('td',{'class':'td'}, renderMaxFreqSelect(st.cpu_avail_freqs,st.cpu_max_freq)) ]),
 					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('Overclock'))), E('td',{'class':'td'}, renderOcControls()) ]),
-					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('CPU Cores'))), E('td',{'class':'td'},(st.cpu_count||0).toString()) ])
+					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('CPU Cores'))), E('td',{'class':'td'},(st.cpu_count||0).toString()) ]),
+					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('Temperature'))), E('td',{'class':'td'}, st.cpu_temp ? (st.cpu_temp / 1000).toFixed(1) + ' °C' : 'N/A') ])
 				])
 			]),
 
@@ -470,11 +449,7 @@ return view.extend({
 					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('Firmware / Clock / Cores'))),
 						E('td',{'class':'td','id':'npu-info'}, (st.npu_version||'N/A')+' | '+(st.npu_clock?(st.npu_clock/1e6).toFixed(0)+' MHz':'N/A')+' | '+(st.npu_cores||0)+' cores') ]),
 					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('Reserved Memory'))),
-						E('td',{'class':'td','id':'npu-memory'}, calcTotalMem(memR)+' ('+memR.length+' regions)') ]),
-					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('VLAN Offload'))),
-						E('td',{'class':'td'}, renderVlanOffloadSelect(vo.enabled)) ]),
-					E('tr',{'class':'tr'},[ E('td',{'class':'td'},E('strong',{},_('PPPoE Offload'))),
-						E('td',{'class':'td'}, renderPPPoEOffloadSelect(po.enabled)) ])
+						E('td',{'class':'td','id':'npu-memory'}, calcTotalMem(memR)+' ('+memR.length+' regions)') ])
 				]),
 
 				// Frame Engine diagram (includes WiFi bands, PPE flows, NPU indicator)
@@ -495,16 +470,14 @@ return view.extend({
 		]);
 
 		poll.add(L.bind(function() {
-			return Promise.all([ callNpuStatus(), callPpeEntries(), callTokenInfo(), callFrameEngine(), callGetVlanOffload(), callGetPPPoEOffload() ]).then(L.bind(function(d) {
+			return Promise.all([ callNpuStatus(), callPpeEntries(), callTokenInfo(), callFrameEngine() ]).then(L.bind(function(d) {
 				injectCSS();
-				var st=d[0]||{}, ppe=d[1]||{}, ti=d[2]||{}, fe=d[3]||{}, vo=d[4]||{}, po=d[5]||{};
+				var st=d[0]||{}, ppe=d[1]||{}, ti=d[2]||{}, fe=d[3]||{};
 				var entries = Array.isArray(ppe.entries)?ppe.entries:[];
 
 				updateFreqBar(st.cpu_hw_freq,st.cpu_min_freq,st.cpu_max_freq,st.pll_freq_mhz,st.cpu_governor);
 				var gs=document.getElementById('cpu-governor-select'); if(gs&&!gs.matches(':focus')) gs.value=st.cpu_governor||'';
 				var fs=document.getElementById('cpu-maxfreq-select'); if(fs&&!fs.matches(':focus')) fs.value=(st.cpu_max_freq||0).toString();
-				var vs=document.getElementById('vlan-offload-select'); if(vs&&!vs.matches(':focus')) vs.value=(vo.enabled?'1':'0');
-				var ps=document.getElementById('pppoe-offload-select'); if(ps&&!ps.matches(':focus')) ps.value=(po.enabled?'1':'0');
 
 				var se=document.getElementById('npu-status');
 				if(se){se.innerHTML='';var sp=document.createElement('span');sp.className=st.npu_loaded?'label-success':'label-danger';sp.textContent=st.npu_loaded?(_('Active')+(st.npu_device?' ('+st.npu_device+')':'')):_('Not Active');se.appendChild(sp);}

@@ -16,45 +16,50 @@
 	#size-cells = <2>;
 
 	reserved-memory {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
+                #address-cells = <2>;
+                #size-cells = <2>;
+                ranges;
 
-		atf@80000000 {
-			no-map;
-			reg = <0x0 0x80000000 0x0 0x200000>;
-		};
+                atf@80000000 {
+                        no-map;
+                        reg = <0x0 0x80000000 0x0 0x200000>;
+                };
 
-		npu_binary: npu-binary@84000000 {
-			no-map;
-			reg = <0x0 0x84000000 0x0 0xa00000>;
-		};
+                npu_binary: npu-binary@84000000 {
+                        no-map;
+                        reg = <0x0 0x84000000 0x0 0xa00000>;
+                };
 
-		qdma0_buf: qdma0-buf@87000000 {
-			no-map;
-			reg = <0x0 0x87000000 0x0 0x2000000>;
-		};
+                qdma0_buf: qdma0-buf@87000000 {
+                        no-map;
+                        reg = <0x0 0x87000000 0x0 0x1000000>;
+                };
 
-		qdma1_buf: qdma1-buf@89000000 {
-			no-map;
-			reg = <0x0 0x89000000 0x0 0x1000000>;
-		};
+                qdma1_buf: qdma1-buf@89000000 {
+                        no-map;
+                        reg = <0x0 0x89000000 0x0 0x800000>;
+                };
 
-		npu_pkt: npu-pkt@8a000000 {
-			no-map;
-			reg = <0x0 0x8a000000 0x0 0x2c00000>;
-		};
+                npu_pkt: npu-pkt@8a000000 {
+                        no-map;
+                        reg = <0x0 0x8a000000 0x0 0x1800000>;
+                };
 
-		npu_txpkt: npu-txpkt@8cc00000 {
-			no-map;
-			reg = <0x0 0x8cc00000 0x0 0x4000000>;
-		};
+                npu_txpkt: npu-txpkt@8cc00000 {
+                        no-map;
+                        reg = <0x0 0x8cc00000 0x0 0x2000000>;
+                };
 
-		npu_txbufid: npu-txbufid@90c00000 {
-			no-map;
-			reg = <0x0 0x90c00000 0x0 0x6800>;
-		};
-	};
+                npu_txbufid: npu-txbufid@90c00000 {
+                        no-map;
+                        reg = <0x0 0x90c00000 0x0 0x6800>;
+                };
+
+                npu_ba: npu-ba@90c06800 {
+                        no-map;
+                        reg = <0x0 0x90c06800 0x0 0x200000>;
+                };
+        };
 
 	psci {
 		compatible = "arm,psci-1.0";
@@ -152,7 +157,7 @@
 
 	cpufreq: cpufreq {
 		reg = <0x0 0x1fa20000 0x0 0x2c0>, <0x0 0x1efbe000 0x0 0x800>;
-		reg-names = "chip-scu", "mcucfg";
+                reg-names = "chip-scu", "mcucfg";
 		compatible = "airoha,en7581-cpufreq";
 
 		operating-points-v2 = <&cpu_smcc_opp_table>;
@@ -166,79 +171,79 @@
 		opp-shared;
 
 		opp-700000000 {
-			opp-hz = /bits/ 64 <700000000>;
-			required-opps = <&smcc_opp0>;
-		};
+                        opp-hz = /bits/ 64 <700000000>;
+                        required-opps = <&smcc_opp4>;
+                };
 
-		opp-750000000 {
-			opp-hz = /bits/ 64 <750000000>;
-			required-opps = <&smcc_opp1>;
-		};
+                opp-750000000 {
+                        opp-hz = /bits/ 64 <750000000>;
+                        required-opps = <&smcc_opp5>;
+                };
 
-		opp-800000000 {
-			opp-hz = /bits/ 64 <800000000>;
-			required-opps = <&smcc_opp2>;
-		};
+                opp-800000000 {
+                        opp-hz = /bits/ 64 <800000000>;
+                        required-opps = <&smcc_opp6>;
+                };
 
-		opp-850000000 {
-			opp-hz = /bits/ 64 <850000000>;
-			required-opps = <&smcc_opp3>;
-		};
+                opp-850000000 {
+                        opp-hz = /bits/ 64 <850000000>;
+                        required-opps = <&smcc_opp7>;
+                };
 
-		opp-9000000000 {
-			opp-hz = /bits/ 64 <900000000>;
-			required-opps = <&smcc_opp4>;
-		};
+                opp-9000000000 {
+                        opp-hz = /bits/ 64 <900000000>;
+                        required-opps = <&smcc_opp8>;
+                };
 
-		opp-9500000000 {
-			opp-hz = /bits/ 64 <950000000>;
-			required-opps = <&smcc_opp5>;
-		};
+                opp-9500000000 {
+                        opp-hz = /bits/ 64 <950000000>;
+                        required-opps = <&smcc_opp9>;
+                };
 
-		opp-10000000000 {
-			opp-hz = /bits/ 64 <1000000000>;
-			required-opps = <&smcc_opp6>;
-		};
+                opp-10000000000 {
+                        opp-hz = /bits/ 64 <1000000000>;
+                        required-opps = <&smcc_opp10>;
+                };
 
-		opp-10500000000 {
-			opp-hz = /bits/ 64 <1050000000>;
-			required-opps = <&smcc_opp7>;
-		};
+                opp-10500000000 {
+                        opp-hz = /bits/ 64 <1050000000>;
+                        required-opps = <&smcc_opp11>;
+                };
 
-		opp-11000000000 {
-			opp-hz = /bits/ 64 <1100000000>;
-			required-opps = <&smcc_opp8>;
-		};
+                opp-11000000000 {
+                        opp-hz = /bits/ 64 <1100000000>;
+                        required-opps = <&smcc_opp12>;
+                };
 
-		opp-11500000000 {
-			opp-hz = /bits/ 64 <1150000000>;
-			required-opps = <&smcc_opp9>;
-		};
+                opp-11500000000 {
+                        opp-hz = /bits/ 64 <1150000000>;
+                        required-opps = <&smcc_opp13>;
+                };
 
-		opp-12000000000 {
-			opp-hz = /bits/ 64 <1200000000>;
-			required-opps = <&smcc_opp10>;
-		};
+                opp-12000000000 {
+                        opp-hz = /bits/ 64 <1200000000>;
+                        required-opps = <&smcc_opp14>;
+                };
 
-		opp-12500000000 {
-			opp-hz = /bits/ 64 <1250000000>;
-			required-opps = <&smcc_opp11>;
-		};
+                opp-12500000000 {
+                        opp-hz = /bits/ 64 <1250000000>;
+                        required-opps = <&smcc_opp14>;
+                };
 
-		opp-13000000000 {
-			opp-hz = /bits/ 64 <1300000000>;
-			required-opps = <&smcc_opp12>;
-		};
+                opp-13000000000 {
+                        opp-hz = /bits/ 64 <1300000000>;
+                        required-opps = <&smcc_opp14>;
+                };
 
-		opp-13500000000 {
-			opp-hz = /bits/ 64 <1350000000>;
-			required-opps = <&smcc_opp13>;
-		};
+                opp-13500000000 {
+                        opp-hz = /bits/ 64 <1350000000>;
+                        required-opps = <&smcc_opp14>;
+                };
 
-		opp-14000000000 {
-			opp-hz = /bits/ 64 <1400000000>;
-			required-opps = <&smcc_opp14>;
-		};
+                opp-14000000000 {
+                        opp-hz = /bits/ 64 <1400000000>;
+                        required-opps = <&smcc_opp14>;
+                };
 	};
 
 	cpu_smcc_opp_table: opp-table-cpu-smcc {
@@ -389,7 +394,6 @@
 			      <0x0 0x09400000 0x0 0x2000>,
 			      <0x0 0x09500000 0x0 0x2000>,
 			      <0x0 0x09600000 0x0 0x20000>;
-			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		uart1: serial@1fbf0000 {
@@ -571,7 +575,7 @@
 			#phy-cells = <1>;
 		};
 
-		crypto@1e004000 {
+		crypto: crypto@1e004000 {
 			compatible = "inside-secure,safexcel-eip93ies";
 			reg = <0x0 0x1fb70000 0x0 0x1000>;
 
@@ -725,7 +729,10 @@
 
 			mediatek,pbus-csr = <&pbus_csr 0x0 0x4>;
 
+			airoha,chip-scu = <&chip_scu>;
 			airoha,np-scu = <&scuclk>;
+			airoha,x2-mode;
+			airoha,serdes-lanes-mask = <0x3>;
 
 			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
 			bus-range = <0x00 0xff>;
@@ -813,6 +820,8 @@
 
 			mediatek,pbus-csr = <&pbus_csr 0x10 0x14>;
 
+			airoha,chip-scu = <&chip_scu>;
+			airoha,serdes-lanes-mask = <0x4>;
 			airoha,np-scu = <&scuclk>;
 
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
@@ -852,9 +861,10 @@
 				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
 			memory-region = <&npu_binary>, <&npu_pkt>, <&npu_txpkt>,
-					<&npu_txbufid>;
+					<&npu_txbufid>, <&npu_ba>;
 			memory-region-names = "binary", "pkt", "tx-pkt",
-					      "tx-bufid";
+					      "tx-bufid", "ba";
+			status = "okay";
 		};
 
 		eth: ethernet@1fb50000 {
@@ -892,7 +902,7 @@
 
 			airoha,npu = <&npu>;
 
-			status = "disabled";
+			status = "okay";
 
 			#address-cells = <1>;
 			#size-cells = <0>;
